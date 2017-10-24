@@ -120,6 +120,8 @@ def protected():
 
 
     friendsid=getUserFriend(flask_login.current_user.id)
+    if friendsid==None:
+        return render_template('Friends.html')
     friends=[]
     loginin_user=getUsersId(flask_login.current_user.id)
     for item in friendsid:

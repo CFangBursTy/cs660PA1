@@ -5,12 +5,14 @@
     <title>Your Friends Are Here!</title>
 </head>
 <body>
+{% if friends %}
 <h1>Your Friends Are Here!</h1>
 {% for row1 in friends %}
 <li>
     {{ row1 }}
 </li>
 {% endfor %}
+{% endif %}
 </body>
 <body>
 
