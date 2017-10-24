@@ -1,0 +1,13 @@
+<head>
+    <title>Upload a file!</title>
+</head>
+    <body>
+        <div class="title">
+            <h1>Upload a file to your project</h1>
+        </div>
+            <form method="post" enctype="multipart/form-data" action="/upload">
+                <label for="File">Select File:</label>
+                <input type="file" name="uploadFile" required='true' /><br />
+                <input type="submit" value="Upload" />
+            </form>
+    </body>

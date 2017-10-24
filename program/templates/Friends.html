@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Your Friends Are Here!</title>
+</head>
+<body>
+<h1>Your Friends Are Here!</h1>
+{% for row1 in friends %}
+<li>
+    {{ row1 }}
+</li>
+{% endfor %}
+</body>
+<body>
+
+<form method="POST"  action="/Friends">
+                <label for="add friend">Add a new friend:</label>
+                <input type="text" name="addfriend"  /><br />
+                <input type="submit" value="Submit">
+                <br><label for="delete friend">Delete a Friend:</label>
+                <input type="text" name="deletefriend" /><br />
+                <input type="submit" value="Submit">
+</form>
+</body>
+</html>

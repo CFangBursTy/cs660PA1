@@ -1,0 +1,10 @@
+{% if message %}
+  <h4>{{message}}!</h4>
+{% endif %}
+{% if data %}
+    <p> Welcome to the homepage of {{data}}! </p>
+    {% else %}
+    <p> Welcome to the homepage of no one! </p>
+{% endif %}
+
+<h4> Back <a href='/upload'> home!</a> </h4>
