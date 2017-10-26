@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Fantastic Albums!</title>
+</head>
+<body>
+{% if albums %}
+<h1>Album List: </h1>
+{% for row in albums %}
+<li>
+    <a href="/photos">{{ row }}</a>
+    <form action="/albums" method="POST">
+        <button type="submit" name="delete album"  value="{{ row }}" >Delete</button>
+    </form>
+
+</li> <br/>
+{% endfor %}
+{% endif %}
+</body>
+<body>
+
+<form method="POST"  action="/albums">
+                <br/>
+                <label for="add album">Add a new album here! <br/>
+                    Please enter the name of your new album:</label>
+                <input type="text" name="add album" required="true" />
+                <input type="submit" value="Add">
+                {#<br><label for="delete album">Delete a album:</label>
+                <input type="text" name="delete album" /><br />
+                <input type="submit" value="Submit">#}
+</form>
+</body>
+</html>

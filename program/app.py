@@ -24,8 +24,8 @@ app.secret_key = 'super secret string'  # Change this!
 
 # These will need to be changed according to your creditionals
 app.config['MYSQL_DATABASE_USER'] = 'root'
-app.config['MYSQL_DATABASE_PASSWORD'] = 'hello'
-app.config['MYSQL_DATABASE_DB'] = 'photoshare'
+app.config['MYSQL_DATABASE_PASSWORD'] = 'Hellcat'
+app.config['MYSQL_DATABASE_DB'] = 'photoshare_pa'
 app.config['MYSQL_DATABASE_HOST'] = 'localhost'
 mysql.init_app(app)
 
@@ -38,6 +38,7 @@ cursor = conn.cursor()
 cursor.execute("SELECT email FROM Users")
 users = cursor.fetchall()
 
+current_visiting_UserId = -1
 
 def getUserList():
     cursor = conn.cursor()
@@ -109,6 +110,27 @@ def DeleteFriend(uid):
     print(cursor.execute("delete from friends where (User_id_1='{0}' and FriendsUser_id_2='{1}') or (User_id_1='{1}' and FriendsUser_id_2='{0}')".format(curid,getUsersId(uid))))
     conn.commit()
 
+def addAlbum(aname, uid):
+    cursor = conn.cursor()
+    uid = getUserIdFromEmail(uid)
+    query = "insert into albums(Album_name, User_id) values ('{0}', '{1}')". format(aname, uid)
+    cursor.execute(query)
+    conn.commit()
+
+def deleteAlbum(aname, uid):
+    cursor = conn.cursor()
+    uid = getUserIdFromEmail(uid)
+    query = "delete from albums where User_id = '{0}' and Album_name = '{1}'".format(uid, aname)
+    cursor.execute(query)
+    conn.commit()
+
+def getUserAlbums(uid):
+    cursor = conn.cursor()
+    uid = getUserIdFromEmail(uid)
+    query = "Select * from albums where User_id = '{0}'".format(uid)
+    if cursor.execute(query):
+        return cursor.fetchall()
+
 @app.route('/Friends',methods=["POST","GET"])
 @flask_login.login_required
 def protected():
@@ -131,10 +153,12 @@ def protected():
             friends.append(getUsersInfor(item[0]))
     return render_template('Friends.html',friends=friends)
 
-@app.route('/login', methods=['GET', 'POST'])
+@app.route('/login', methods=['GET'])
 def login():
-    if flask.request.method == 'GET':
+    if flask_login.current_user == None or not flask_login.current_user.is_authenticated:
         return render_template('login.html')
+    elif flask_login.current_user.is_authenticated:
+        return redirect(url_for('homepage', name=flask_login.current_user.id))
         # '''
 			#    <form action='login' method='POST'>
 			# 	<input type='text' name='email' id='email' placeholder='email'></input>
@@ -144,8 +168,9 @@ def login():
 		 #   <a href='/'>Home</a>
 			#    '''
     # The request method is POST (page is recieving data)
+@app.route('/login', methods=['POST'])
+def login_post():
     email = flask.request.form['email']
-    print (email)
     cursor = conn.cursor()
     # check if email is registered
     if cursor.execute("SELECT password FROM Users WHERE email = '{0}'".format(email)):
@@ -155,13 +180,28 @@ def login():
             user = User()
             user.id = email
             flask_login.login_user(user)  # okay login in user
+            global current_visiting_UserId
+            current_visiting_UserId = user.id
+
+            #current_visiting_UserId = getUsersId(flask_login.current_user.id)
             data=getUsersInfor(flask_login.current_user.id)
-            return render_template('hello.html', name=flask_login.current_user.id, message="Here's your profile",data=data)
+            print(data)
+            print(type(data))
+            return redirect(url_for('homepage', name=flask_login.current_user.id))
+
+            #return render_template('hello.html', name=flask_login.current_user.id, message="1Here's your profile",data=data)
             #return flask.redirect(flask.url_for('protect3d'))  # protected is a function defined in this file
 
     # information did not match
     return "<a href='/login'>Try again</a>\
 			</br><a href='/register'>or make an account</a>"
+
+@app.route('/homepage')
+@flask_login.login_required
+def homepage():
+    #print(request.args.get('data').split())
+    data = getUsersInfor(request.args.get('name'))
+    return render_template('hello.html', name=request.args.get('name'), message='Awesome Photoshare System', data=data)
 
 
 @app.route('/logout')
@@ -211,6 +251,62 @@ def register_user():
     else:
         print("couldn't find all tokens")
         return flask.redirect(flask.url_for('register'))
+
+@app.route("/albums", methods=['GET'])
+def album_get():
+
+    albums = getUserAlbums(flask_login.current_user.id)
+    albumsInfo = []
+    for a in albums:
+        albumsInfo.append(a[1])
+
+    return render_template('albums.html', albums=albumsInfo)
+
+@app.route("/albums", methods=['POST'])
+def album_post():
+    print(str(request.form))
+    if request.form.get('add album'):
+        addAlbum(request.form.get('add album'), flask_login.current_user.id)
+        albums = getUserAlbums(flask_login.current_user.id)
+        albumsInfo = []
+        for a in albums:
+            albumsInfo.append(a[1])
+        return render_template('albums.html', albums=albumsInfo)
+
+    if request.form:
+
+        deleteAlbum(request.form['delete album'], flask_login.current_user.id)
+        albums = getUserAlbums(flask_login.current_user.id)
+        albumsInfo = []
+        for a in albums:
+            albumsInfo.append(a[1])
+        return render_template('albums.html', albums=albumsInfo)
+
+
+
+
+
+            #if request.form.get('delete album'):
+
+    '''
+    if request.method=='POST':
+        if request.form.get('addfriend'):
+           AddFriend(request.form.get('addfriend'))
+        if request.form.get('deletefriend'):
+            DeleteFriend(request.form.get('deletefriend'))
+
+
+    friendsid=getUserFriend(flask_login.current_user.id)
+    if friendsid==None:
+        return render_template('Friends.html')
+    friends=[]
+    loginin_user=getUsersId(flask_login.current_user.id)
+    for item in friendsid:
+        if item[0]==loginin_user:
+            friends.append(getUsersInfor(item[1]))
+        else:
+            friends.append(getUsersInfor(item[0]))
+    return render_template('Friends.html',friends=friends )'''
 
 
 def getUsersPhotos(uid):
