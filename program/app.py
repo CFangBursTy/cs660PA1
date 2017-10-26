@@ -257,8 +257,9 @@ def album_get():
 
     albums = getUserAlbums(flask_login.current_user.id)
     albumsInfo = []
-    for a in albums:
-        albumsInfo.append(a[1])
+    if albums != None:
+        for a in albums:
+            albumsInfo.append(a[1])
 
     return render_template('albums.html', albums=albumsInfo)
 
@@ -278,8 +279,9 @@ def album_post():
         deleteAlbum(request.form['delete album'], flask_login.current_user.id)
         albums = getUserAlbums(flask_login.current_user.id)
         albumsInfo = []
-        for a in albums:
-            albumsInfo.append(a[1])
+        if albums != None:
+            for a in albums:
+                albumsInfo.append(a[1])
         return render_template('albums.html', albums=albumsInfo)
 
 
