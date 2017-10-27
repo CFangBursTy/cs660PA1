@@ -185,8 +185,6 @@ def login_post():
 
             #current_visiting_UserId = getUsersId(flask_login.current_user.id)
             data=getUsersInfor(flask_login.current_user.id)
-            print(data)
-            print(type(data))
             return redirect(url_for('homepage', name=flask_login.current_user.id))
 
             #return render_template('hello.html', name=flask_login.current_user.id, message="1Here's your profile",data=data)
@@ -203,6 +201,9 @@ def homepage():
     data = getUsersInfor(request.args.get('name'))
     return render_template('hello.html', name=request.args.get('name'), message='Awesome Photoshare System', data=data)
 
+@app.route('/photo')
+def photo():
+    print (request.args.get('album_id'))
 
 @app.route('/logout')
 def logout():
@@ -257,32 +258,41 @@ def album_get():
 
     albums = getUserAlbums(flask_login.current_user.id)
     albumsInfo = []
+    albumIDs = []
     if albums != None:
         for a in albums:
             albumsInfo.append(a[1])
+            albumIDs.append(a[0])
 
-    return render_template('albums.html', albums=albumsInfo)
+    return render_template('albums.html', albums=albumsInfo, IDs=albumIDs)
 
 @app.route("/albums", methods=['POST'])
 def album_post():
-    print(str(request.form))
+    print(str(request))
     if request.form.get('add album'):
         addAlbum(request.form.get('add album'), flask_login.current_user.id)
         albums = getUserAlbums(flask_login.current_user.id)
         albumsInfo = []
-        for a in albums:
-            albumsInfo.append(a[1])
-        return render_template('albums.html', albums=albumsInfo)
+        albumIDs = []
+        if albums != None:
+            for a in albums:
+                albumsInfo.append(a[1])
+                albumIDs.append(a[0])
+
+        return render_template('albums.html', albums=albumsInfo, IDs=albumIDs)
 
     if request.form:
 
         deleteAlbum(request.form['delete album'], flask_login.current_user.id)
         albums = getUserAlbums(flask_login.current_user.id)
         albumsInfo = []
+        albumIDs = []
         if albums != None:
             for a in albums:
                 albumsInfo.append(a[1])
-        return render_template('albums.html', albums=albumsInfo)
+                albumIDs.append(a[0])
+
+        return render_template('albums.html', albums=albumsInfo, IDs=albumIDs)
 
 
 

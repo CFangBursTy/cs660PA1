@@ -9,7 +9,7 @@
 <h1>Album List: </h1>
 {% for row in albums %}
 <li>
-    <a href="/photos">{{ row }}</a>
+    <a href="/photo?album_id={{ IDs[loop.index0] }}">{{ row }}</a>
     <form action="/albums" method="POST">
         <button type="submit" name="delete album"  value="{{ row }}" >Delete</button>
     </form>
