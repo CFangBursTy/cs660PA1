@@ -38,7 +38,6 @@ cursor = conn.cursor()
 cursor.execute("SELECT email FROM Users")
 users = cursor.fetchall()
 
-current_visiting_UserId = -1
 
 def getUserList():
     cursor = conn.cursor()
@@ -49,30 +48,7 @@ def getUserList():
 class User(flask_login.UserMixin):
     pass
 
-@login_manager.user_loader
-def user_loader(email):
-    users = getUserList()
-    if not (email) or email not in str(users):
-        return
-    user = User()
-    user.id = email
-    return user
 
-
-@login_manager.request_loader
-def request_loader(request):
-    users = getUserList()
-    email = request.form.get('email')
-    if not (email) or email not in str(users):
-        return
-    user = User()
-    user.id = email
-    cursor = mysql.connect().cursor()
-    cursor.execute("SELECT password FROM Users WHERE email = '{0}'".format(email))
-    data = cursor.fetchall()
-    pwd = str(data[0][0])
-    user.is_authenticated = request.form['password'] == pwd
-    return user
 
 
 '''
@@ -109,6 +85,16 @@ def DeleteFriend(uid):
     curid=getUsersId(flask_login.current_user.id)
     print(cursor.execute("delete from friends where (User_id_1='{0}' and FriendsUser_id_2='{1}') or (User_id_1='{1}' and FriendsUser_id_2='{0}')".format(curid,getUsersId(uid))))
     conn.commit()
+def getUsersPhotos(uid):
+    cursor = conn.cursor()
+    cursor.execute("SELECT imgdata, picture_id, caption FROM Pictures WHERE user_id = '{0}'".format(uid))
+    return cursor.fetchall()  # NOTE list of tuples, [(imgdata, pid), ...]
+
+
+def getUserIdFromEmail(email):
+    cursor = conn.cursor()
+    cursor.execute("SELECT user_id  FROM Users WHERE email = '{0}'".format(email))
+    return cursor.fetchone()[0]
 
 def addAlbum(aname, uid):
     cursor = conn.cursor()
@@ -130,6 +116,60 @@ def getUserAlbums(uid):
     query = "Select * from albums where User_id = '{0}'".format(uid)
     if cursor.execute(query):
         return cursor.fetchall()
+
+
+def isEmailUnique(email):
+    # use this to check if a email has already been registered
+    cursor = conn.cursor()
+    if cursor.execute("SELECT email  FROM Users WHERE email = '{0}'".format(email)):
+        # this means there are greater than zero entries with that email
+        return False
+    else:
+        return True
+
+def dir_create(dirname):  #创建新目录
+    if(os.path.exists(dirname)):  #检查目录是否已经存在
+        print("目录已存在！\n")
+    else:
+        os.mkdir(dirname)         #不存在则按照要求新建该目录
+        print("目录创建成功！\n")
+
+def showPhotos(albumid, uploaded):
+     photopath = "D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(albumid)
+     print(photopath)
+     fnames=os.listdir(photopath)
+     if len(fnames) != 0:
+         print(fnames[0])
+     if uploaded:
+         return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames, message='File uploaded!')
+     else:
+         return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames)
+
+
+@login_manager.user_loader
+def user_loader(email):
+    users = getUserList()
+    if not (email) or email not in str(users):
+        return
+    user = User()
+    user.id = email
+    return user
+
+
+@login_manager.request_loader
+def request_loader(request):
+    users = getUserList()
+    email = request.form.get('email')
+    if not (email) or email not in str(users):
+        return
+    user = User()
+    user.id = email
+    cursor = mysql.connect().cursor()
+    cursor.execute("SELECT password FROM Users WHERE email = '{0}'".format(email))
+    data = cursor.fetchall()
+    pwd = str(data[0][0])
+    user.is_authenticated = request.form['password'] == pwd
+    return user
 
 @app.route('/Friends',methods=["POST","GET"])
 @flask_login.login_required
@@ -185,9 +225,9 @@ def login_post():
 
             #current_visiting_UserId = getUsersId(flask_login.current_user.id)
             data=getUsersInfor(flask_login.current_user.id)
-            return redirect(url_for('homepage', name=flask_login.current_user.id))
+            #return redirect(url_for('homepage', name=flask_login.current_user.id))
 
-            #return render_template('hello.html', name=flask_login.current_user.id, message="1Here's your profile",data=data)
+            return render_template('hello.html', name=flask_login.current_user.id, message="1Here's your profile",data=data)
             #return flask.redirect(flask.url_for('protect3d'))  # protected is a function defined in this file
 
     # information did not match
@@ -201,9 +241,6 @@ def homepage():
     data = getUsersInfor(request.args.get('name'))
     return render_template('hello.html', name=request.args.get('name'), message='Awesome Photoshare System', data=data)
 
-@app.route('/photo')
-def photo():
-    print (request.args.get('album_id'))
 
 @app.route('/logout')
 def logout():
@@ -253,9 +290,12 @@ def register_user():
         print("couldn't find all tokens")
         return flask.redirect(flask.url_for('register'))
 
+
+
+# end login code
+# Show how to upload files and Request Methods and directing pages
 @app.route("/albums", methods=['GET'])
 def album_get():
-
     albums = getUserAlbums(flask_login.current_user.id)
     albumsInfo = []
     albumIDs = []
@@ -278,7 +318,8 @@ def album_post():
             for a in albums:
                 albumsInfo.append(a[1])
                 albumIDs.append(a[0])
-
+        dir_create("D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)))
+        dir_create("D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(albumIDs[-1]))
         return render_template('albums.html', albums=albumsInfo, IDs=albumIDs)
 
     if request.form:
@@ -296,118 +337,37 @@ def album_post():
 
 
 
-
-
-            #if request.form.get('delete album'):
-
-    '''
-    if request.method=='POST':
-        if request.form.get('addfriend'):
-           AddFriend(request.form.get('addfriend'))
-        if request.form.get('deletefriend'):
-            DeleteFriend(request.form.get('deletefriend'))
-
-
-    friendsid=getUserFriend(flask_login.current_user.id)
-    if friendsid==None:
-        return render_template('Friends.html')
-    friends=[]
-    loginin_user=getUsersId(flask_login.current_user.id)
-    for item in friendsid:
-        if item[0]==loginin_user:
-            friends.append(getUsersInfor(item[1]))
-        else:
-            friends.append(getUsersInfor(item[0]))
-    return render_template('Friends.html',friends=friends )'''
-
-
-def getUsersPhotos(uid):
-    cursor = conn.cursor()
-    cursor.execute("SELECT imgdata, picture_id, caption FROM Pictures WHERE user_id = '{0}'".format(uid))
-    return cursor.fetchall()  # NOTE list of tuples, [(imgdata, pid), ...]
-
-
-def getUserIdFromEmail(email):
-    cursor = conn.cursor()
-    cursor.execute("SELECT user_id  FROM Users WHERE email = '{0}'".format(email))
-    return cursor.fetchone()[0]
-
-
-def isEmailUnique(email):
-    # use this to check if a email has already been registered
-    cursor = conn.cursor()
-    if cursor.execute("SELECT email  FROM Users WHERE email = '{0}'".format(email)):
-        # this means there are greater than zero entries with that email
-        return False
-    else:
-        return True
-
-def dir_create(dirname):  #创建新目录
-    if(os.path.exists(dirname)):  #检查目录是否已经存在
-        print("目录已存在！\n")
-    else:
-        os.mkdir(dirname)         #不存在则按照要求新建该目录
-        print("目录创建成功！\n")
-
-# end login code
-# Show how to upload files and Request Methods and directing pages
-
 @app.route('/upload', methods=['GET', 'POST'])
 @flask_login.login_required
 def upload_file():
+    #if request.request=='GET':
+    albumid=request.args.get('album_id')
+    #print(albumid)
     if request.method == 'POST':
-        UPLOAD_FOLDER = "C:/Users/廖山海/Desktop/CS/Database/Project1/program/uploaded/'{0}'".format(getUsersId(flask_login.current_user.id))  ### CHANGE THIS
+        UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(albumid)  ### CHANGE THIS
         dir_create(UPLOAD_FOLDER)
         app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
         uploadfile = request.files['uploadFile']
         filename = uploadfile.filename
         uploadfile.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        return render_template('message.html', message='File uploaded!',)
+
+        photopath = "static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(
+            albumid)
+        fnames = os.listdir(photopath)
+        return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames, message='File uploaded!')
     else:     # The method is GET so we return a  HTML form to upload the a photo.
-        return render_template('upload.html')
+        photopath = "static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(
+            albumid)
+        fnames = os.listdir(photopath)
+        print(photopath)
+
+        return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames)
 # END
 
 @app.route('/profile')
 @flask_login.login_required
 def protect3d():
     return render_template('hello.html', name=flask_login.current_user.id, message="Here's your profile")
-
-
-
-# begin photo uploading code
-# photos uploaded using base64 encoding so they can be directly embeded in HTML
-'''
-ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg', 'gif'])
-
-
-
-def allowed_file(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
-
-
-@app.route('/upload', methods=['GET', 'POST'])
-@flask_login.login_required
-def upload_file():
-    if request.method == 'POST':
-        uid = getUserIdFromEmail(flask_login.current_user.id)
-        imgfile = request.files['photo']
-        caption = request.form.get('caption')
-        print(caption)
-        photo_data = base64.standard_b64encode(imgfile.read())
-        cursor = conn.cursor()
-        cursor.execute(
-            "INSERT INTO Pictures (imgdata, user_id, caption) VALUES ('{0}', '{1}', '{2}' )".format(photo_data, uid,
-                                                                                                    caption))
-        conn.commit()
-        return render_template('hello.html', name=flask_login.current_user.id, message='Photo uploaded!',
-                               photos=getUsersPhotos(uid))
-    # The method is GET so we return a  HTML form to upload the a photo.
-    else:
-        return render_template('upload.html')
-
-
-# end photo uploading code
-'''
 
 # default page
 @app.route("/", methods=['GET'])
