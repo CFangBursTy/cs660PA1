@@ -1,18 +1,10 @@
-######################################
-# author ben lawson <balawson@bu.edu> 
-# Edited by: Baichuan Zhou (baichuan@bu.edu) and Craig Einstein <einstein@bu.edu>
-######################################
-# Some code adapted from 
-# CodeHandBook at http://codehandbook.org/python-web-application-development-using-flask-and-mysql/
-# and MaxCountryMan at https://github.com/maxcountryman/flask-login/
-# and Flask Offical Tutorial at  http://flask.pocoo.org/docs/0.10/patterns/fileuploads/
-# see links for further understanding
-###################################################
-
+# Shanhai Path: C:/Users/廖山海/Desktop/CS/Database/Project1/program
+# Chao path: D:/BUCS/PhotoShare/program
 import flask
 from flask import Flask, Response, request, render_template, redirect, url_for
 from flaskext.mysql import MySQL
 import flask.ext.login as flask_login
+from datetime import date,datetime
 
 # for image uploading
 # from werkzeug import secure_filename
@@ -99,7 +91,9 @@ def getUserIdFromEmail(email):
 def addAlbum(aname, uid):
     cursor = conn.cursor()
     uid = getUserIdFromEmail(uid)
-    query = "insert into albums(Album_name, User_id) values ('{0}', '{1}')". format(aname, uid)
+    Date= datetime.now().date()
+    print(Date)
+    query = "insert into albums(Album_name, User_id,Create_Date) values ('{0}', {1},'{2}')". format(aname, uid,Date)
     cursor.execute(query)
     conn.commit()
 
@@ -130,20 +124,26 @@ def isEmailUnique(email):
 def dir_create(dirname):  #创建新目录
     if(os.path.exists(dirname)):  #检查目录是否已经存在
         print("目录已存在！\n")
+        return True
     else:
         os.mkdir(dirname)         #不存在则按照要求新建该目录
         print("目录创建成功！\n")
+        return False
 
-def showPhotos(albumid, uploaded):
-     photopath = "D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(albumid)
+def showPhotos(albumid):
+     photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id),albumid)
      print(photopath)
-     fnames=os.listdir(photopath)
-     if len(fnames) != 0:
-         print(fnames[0])
-     if uploaded:
-         return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames, message='File uploaded!')
-     else:
-         return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames)
+     filename=os.listdir(photopath)
+     print(filename)
+     return render_template('upload.html', photopath=photopath,uid=str(getUsersId(flask_login.current_user.id)),aid=str(albumid),photos=filename)
+
+def AddPhoto(albumid,filename):
+    userid=getUsersId(flask_login.current_user.id)
+    cursor=conn.cursor()
+    print(filename)
+    cursor.execute("insert into photos(Caption,Album_id,User_id) values('{0}',{1},{2})".format(filename,albumid,userid))
+    conn.commit()
+
 
 
 @login_manager.user_loader
@@ -241,7 +241,6 @@ def homepage():
     data = getUsersInfor(request.args.get('name'))
     return render_template('hello.html', name=request.args.get('name'), message='Awesome Photoshare System', data=data)
 
-
 @app.route('/logout')
 def logout():
     flask_login.logout_user()
@@ -310,16 +309,20 @@ def album_get():
 def album_post():
     print(str(request))
     if request.form.get('add album'):
-        addAlbum(request.form.get('add album'), flask_login.current_user.id)
         albums = getUserAlbums(flask_login.current_user.id)
+        if albums == None:
+            dir_create("D:/BUCS/PhotoShare/program/static/{0}".format(getUsersId(flask_login.current_user.id)))
+        addAlbum(request.form.get('add album'), flask_login.current_user.id)
         albumsInfo = []
         albumIDs = []
-        if albums != None:
-            for a in albums:
-                albumsInfo.append(a[1])
-                albumIDs.append(a[0])
-        dir_create("D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)))
-        dir_create("D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(albumIDs[-1]))
+        albums = getUserAlbums(flask_login.current_user.id)
+        for a in albums:
+            albumsInfo.append(a[1])
+            albumIDs.append(a[0])
+        dir_create("D:/BUCS/PhotoShare/program/static/{0}/{1}".format(
+            getUsersId(flask_login.current_user.id),albumIDs[-1]))
+        print(albumsInfo)
+        print(albumIDs)
         return render_template('albums.html', albums=albumsInfo, IDs=albumIDs)
 
     if request.form:
@@ -337,32 +340,43 @@ def album_post():
 
 
 
-@app.route('/upload', methods=['GET', 'POST'])
+@app.route('/upload', methods=['POST'])
 @flask_login.login_required
 def upload_file():
     #if request.request=='GET':
-    albumid=request.args.get('album_id')
-    #print(albumid)
-    if request.method == 'POST':
-        UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(albumid)  ### CHANGE THIS
+        albumid=request.args.get('album_id')
+        UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(getUsersId(flask_login.current_user.id),albumid)  ### CHANGE THIS
         dir_create(UPLOAD_FOLDER)
         app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
         uploadfile = request.files['uploadFile']
         filename = uploadfile.filename
         uploadfile.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-
-        photopath = "static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(
-            albumid)
-        fnames = os.listdir(photopath)
-        return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames, message='File uploaded!')
-    else:     # The method is GET so we return a  HTML form to upload the a photo.
-        photopath = "static/" + str(getUsersId(flask_login.current_user.id)) + '/' + str(
-            albumid)
-        fnames = os.listdir(photopath)
-        print(photopath)
-
-        return render_template('upload.html', photopath=photopath, aid=albumid, fname=fnames)
+        #showPhotos(albumid,filename)
+        photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
+        AddPhoto(albumid,filename)
+        #print(photopath)
+        filename = os.listdir(UPLOAD_FOLDER)
+        #print(filename)
+        if request.form.get('delete album'):
+            print("hello world")
+        return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),aid=albumid, fname=filename)
 # END
+@app.route('/upload', methods=['GET'])
+@flask_login.login_required
+def show_photo():
+    albumid = request.args.get('album_id')
+    photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
+    UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(
+        getUsersId(flask_login.current_user.id), albumid)  ### CHANGE THIS
+    print(UPLOAD_FOLDER)
+    if not dir_create(UPLOAD_FOLDER):
+        return render_template('upload.html')
+    else:
+       filename = os.listdir(UPLOAD_FOLDER)
+       print('hhhhhhhhhhhhhhhh')
+       return render_template('upload.html', photopath=photopath, uid=getUsersId(flask_login.current_user.id),
+                            aid=albumid, fname=filename)
+
 
 @app.route('/profile')
 @flask_login.login_required

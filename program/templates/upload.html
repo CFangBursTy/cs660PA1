@@ -9,7 +9,6 @@
                 <label for="File">Select File:</label>
                 <input type="file" name="uploadFile" required='true' /><br />
                 <input type="submit" value="Upload" />
-            </form>
         {% if message %}
             <h4>{{message}}!</h4>
         {% endif %}
@@ -26,10 +25,12 @@
                             <ul>
                                 <li>{{ img }} <br/>
                                     <img src="{{ photopath }}/{{ img }}" height="80" width="120"></li>
+                                     <input type="submit" name="delete" value="Delete" />
                             </ul>
                         {% endfor %}
 {#                    </tbody>#}
 {#                </table>#}
             {% endif %}
         {% endif %}
+            </form>
     </body>
