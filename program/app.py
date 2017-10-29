@@ -199,7 +199,14 @@ def AddPhoto(albumid,filename):
     cursor.execute("insert into photos(Caption,Album_id,User_id) values('{0}',{1},{2})".format(filename,albumid,userid))
     conn.commit()
 
-
+def DeletePhoto(albumid,photoname):
+    userid = getUsersId(flask_login.current_user.id)
+    cursor = conn.cursor()
+    print("albumid="+albumid)
+    cursor.execute("delete from photos where Caption='{0}' and Album_id={1} and user_id={2}".format(photoname,albumid,userid))
+    conn.commit()
+    path="D:/BUCS/PhotoShare/program/static/{0}/{1}/{2}".format(userid,albumid,photoname)
+    os.remove(path)
 
 @login_manager.user_loader
 def user_loader(email):
@@ -410,9 +417,19 @@ def upload_file():
         tags = getTagsFromCaption(request.form.get('imgname'))
         Photo_Tags[request.form.get('imgname')] = tags
         print(Photo_Tags)
-        print('5555555555555')
         return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
                                 aid=albumid, fname=fname, tags=Photo_Tags)
+    elif request.form.get('delete_photo', None) == "delete":
+        print("helloworld")
+        photoid = request.form.get('photoid')
+        DeletePhoto(albumid, photoid)
+        del Photo_Tags[photoid]
+        print(Photo_Tags)
+        print('55555555555555')
+        fname = os.listdir(UPLOAD_FOLDER)
+
+        return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
+                               aid=albumid, fname=fname, tags=Photo_Tags)
     else:
         dir_create(UPLOAD_FOLDER)
         app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -428,8 +445,11 @@ def upload_file():
 
             AddPhoto(albumid,filename)
             fname = os.listdir(UPLOAD_FOLDER)
+            for f in fname:
+                Photo_Tags[f] = getTagsFromCaption(f)
+            print(Photo_Tags)
             return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
-                               aid=albumid, fname=fname)
+                               aid=albumid, fname=fname, tags=Photo_Tags)
 
 # E
 @app.route('/upload', methods=['GET'])
