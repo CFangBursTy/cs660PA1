@@ -6,31 +6,41 @@
             <h1>Upload a file to your project</h1>
         </div>
             <form method="post" enctype="multipart/form-data" action="/upload?album_id={{ aid }}">
-                <label for="File">Select File:</label>
-                <input type="file" name="uploadFile" required='true' /><br />
+                <label for="uploadFile">Select File:</label>
+                <input type="file" name="uploadFile"  /><br />
                 <input type="submit" value="Upload" />
+            </form>
         {% if message %}
             <h4>{{message}}!</h4>
         {% endif %}
         {% if photopath %}
-{#            <h1>hello</h1>#}
-{#            {% for img in filename %}#}
-{#                < img src="{{ url_for('static', filename="/'1'/'18'") }}" height="50", width="100">#}
-{#            {% endfor %}#}
-{#        {% endif %}#}
             {% if fname %}
-{#                <table>#}
-{#                    <tbody>#}
-                        {% for img in fname %}
-                            <ul>
-                                <li>{{ img }} <br/>
-                                    <img src="{{ photopath }}/{{ img }}" height="80" width="120"></li>
-                                     <input type="submit" name="delete" value="Delete" />
-                            </ul>
-                        {% endfor %}
-{#                    </tbody>#}
-{#                </table>#}
+                {% for img in fname %}
+                    <ul>
+                        <li>{{ img }} <br/>
+                            <img src="{{ photopath }}/{{ img }}" height="80" width="120">
+                            {% if tags %}
+                                <table>
+                                    <tr>
+                                        {% for tag in tags[img] %}
+                                            <td>{{ tag }} |</td>
+                                        {% endfor %}
+                                    </tr>
+                                </table>
+                            {% endif %}
+                            <form action="/upload?album_id={{ aid }}" method="post">
+                                <label for="add tag">Add a  new tag here:</label>
+                                <input type="text" name="add tag">
+                                <input type="hidden" name="imgname" value="{{ img }}">
+                                <input type="submit" value="Add">
+                            </form>
+                            <input type="submit" name="delete" value="Delete" />
+
+                        </li>
+                    </ul>
+                {% endfor %}
+
             {% endif %}
         {% endif %}
-            </form>
+
     </body>

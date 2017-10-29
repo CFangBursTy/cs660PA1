@@ -30,6 +30,7 @@ cursor = conn.cursor()
 cursor.execute("SELECT email FROM Users")
 users = cursor.fetchall()
 
+Photo_Tags = {}
 
 def getUserList():
     cursor = conn.cursor()
@@ -103,6 +104,60 @@ def deleteAlbum(aname, uid):
     query = "delete from albums where User_id = '{0}' and Album_name = '{1}'".format(uid, aname)
     cursor.execute(query)
     conn.commit()
+
+def addTag(tname):
+    cursor = conn.cursor()
+    query = "insert into tags(Tag_name) values ('{0}')".format(tname)
+    # pid = getPhotoIdFromCaption(caption)
+    # query = query + "insert into tagged(Photo_id, Tag_id) values({0}, {1}) ".format(pid, )
+    cursor.execute(query)
+    conn.commit()
+
+def getPhotoIdFromCaption(caption):
+    cursor = conn.cursor()
+    query = "select Photo_id from photos where Caption = '{0}'".format(caption)
+    cursor.execute(query)
+    return cursor.fetchone()[0]
+
+def getTagsFromCaption(caption):
+    cursor = conn.cursor()
+    query = "select Photo_id from photos where Caption = '{0}'".format(caption)
+    cursor.execute(query)
+    pid = cursor.fetchone()[0]
+
+    query = "select Tag_name from tags, tagged where tags.Tag_id = tagged.Tag_id and tagged.Photo_id = '{0}'".format(pid)
+    cursor.execute(query)
+    tags = cursor.fetchall()
+    result = []
+    for tag in tags:
+        result.append(tag[0])
+
+    return result
+    
+
+def addTagged(caption, uid, aid):
+
+    # Get newest added tag id
+    cursor = conn.cursor()
+    alltags = "select Tag_id from tags"
+    cursor.execute(alltags)
+    latest_tag_id = cursor.fetchall()[-1][0]
+
+
+    # Get photo id based on the given caption
+    uid = getUserIdFromEmail(uid)
+    query = "select Photo_id from photos where Caption = '{0}' and  User_id = '{1}' and Album_id = '{2}'".format(
+        caption, uid, aid)
+    cursor.execute(query)
+    pid = cursor.fetchone()[0]
+
+
+    query = "insert into tagged(Photo_id, Tag_id) values ('{0}', '{1}')".format(pid, latest_tag_id)
+    cursor.execute(query)
+    conn.commit()
+
+# def addTagged(tid, pid):
+
 
 def getUserAlbums(uid):
     cursor = conn.cursor()
@@ -220,8 +275,6 @@ def login_post():
             user = User()
             user.id = email
             flask_login.login_user(user)  # okay login in user
-            global current_visiting_UserId
-            current_visiting_UserId = user.id
 
             #current_visiting_UserId = getUsersId(flask_login.current_user.id)
             data=getUsersInfor(flask_login.current_user.id)
@@ -343,27 +396,47 @@ def album_post():
 @app.route('/upload', methods=['POST'])
 @flask_login.login_required
 def upload_file():
-    #if request.request=='GET':
-        albumid=request.args.get('album_id')
-        UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(getUsersId(flask_login.current_user.id),albumid)  ### CHANGE THIS
+    global Photo_Tags
+    albumid = request.args.get('album_id')
+    UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(getUsersId(flask_login.current_user.id),
+                                                                       albumid)
+    photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
+
+    print(request.form)
+    if request.form.get('add tag'):
+        addTag(request.form.get('add tag'))
+        addTagged(request.form.get('imgname'), flask_login.current_user.id, albumid)
+        fname = os.listdir(UPLOAD_FOLDER)
+        tags = getTagsFromCaption(request.form.get('imgname'))
+        Photo_Tags[request.form.get('imgname')] = tags
+        print(Photo_Tags)
+        print('5555555555555')
+        return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
+                                aid=albumid, fname=fname, tags=Photo_Tags)
+    else:
         dir_create(UPLOAD_FOLDER)
         app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
         uploadfile = request.files['uploadFile']
         filename = uploadfile.filename
-        uploadfile.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-        #showPhotos(albumid,filename)
-        photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
-        AddPhoto(albumid,filename)
-        #print(photopath)
-        filename = os.listdir(UPLOAD_FOLDER)
-        #print(filename)
-        if request.form.get('delete album'):
-            print("hello world")
-        return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),aid=albumid, fname=filename)
-# END
+        fname = os.listdir(UPLOAD_FOLDER)
+        if filename in fname:
+            print('duplicate file name')
+            return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
+                                   aid=albumid, fname=fname)
+        else:
+            uploadfile.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
+
+            AddPhoto(albumid,filename)
+            fname = os.listdir(UPLOAD_FOLDER)
+            return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
+                               aid=albumid, fname=fname)
+
+# E
 @app.route('/upload', methods=['GET'])
 @flask_login.login_required
 def show_photo():
+    global Photo_Tags
+    print('66666666666666666666')
     albumid = request.args.get('album_id')
     photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
     UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(
@@ -372,10 +445,13 @@ def show_photo():
     if not dir_create(UPLOAD_FOLDER):
         return render_template('upload.html')
     else:
-       filename = os.listdir(UPLOAD_FOLDER)
-       print('hhhhhhhhhhhhhhhh')
+       fname = os.listdir(UPLOAD_FOLDER)
+       for f in fname:
+           Photo_Tags[f] = getTagsFromCaption(f)
+       print(Photo_Tags)
+
        return render_template('upload.html', photopath=photopath, uid=getUsersId(flask_login.current_user.id),
-                            aid=albumid, fname=filename)
+                            aid=albumid, fname=fname, tags=Photo_Tags)
 
 
 @app.route('/profile')
