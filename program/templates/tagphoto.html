@@ -1,0 +1,37 @@
+<head>
+    <title>Upload a file!</title>
+</head>
+    <body>
+        {% if tag %}
+            <div class="title">
+                <h1>Browse photos with tag {{ tag }}</h1>
+            </div>
+
+        {% endif %}
+        {% if photopath and captions %}
+            {% for path in photopath %}
+                <ul>
+                    <li>{{ captions[loop.index0] }} <br/>
+                        <img src="{{ photopath[loop.index0] }}" height="80" width="120">
+                        {% if alltags %}
+                            <table>
+                                <tr>
+                                    {% for tag in alltags[captions[loop.index0]] %}
+                                        <td>
+                                            <a href="/tagphoto?tagname={{ tag }}"> {{ tag }} |</a>
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            </table>
+                        {% endif %}
+
+
+
+
+                    </li>
+                </ul>
+            {% endfor %}
+
+        {% endif %}
+
+    </body>

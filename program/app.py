@@ -150,6 +150,14 @@ def getTagsFromCaption(caption):
 
     return result
     
+def getAllPhotosFromTag(tagname):
+    cursor = conn.cursor()
+    query = "select Caption, Album_id, User_id from photos, tags, tagged where tags.Tag_name = '{0}' and " \
+            "tags.Tag_id = tagged.Tag_id and tagged.Photo_id = photos.Photo_id".format(tagname)
+    cursor.execute(query)
+    photos = cursor.fetchall()
+
+    return photos
 
 def addTagged(caption, uid, aid):
 
@@ -491,6 +499,23 @@ def show_photo():
        print(os.getcwd())
        return render_template('upload.html', photopath=photopath, uid=getUsersId(flask_login.current_user.id),
                             aid=albumid, fname=fname, tags=Photo_Tags)
+
+@app.route('/tagphoto', methods=['GET'])
+def tagphoto():
+    global Photo_Tags
+    tagname = request.args.get('tagname')
+    print(tagname)
+    allphotos = getAllPhotosFromTag(tagname)
+    captions = []
+    photopath = []
+    for photos in allphotos:
+        photopath.append("/static/{0}/{1}/{2}".format(photos[2], photos[1], photos[0]))
+        captions.append(photos[0])
+
+    print(photopath)
+    print(captions)
+    return  render_template('tagphoto.html', photopath=photopath, tag=tagname, alltags=Photo_Tags, captions=captions)
+
 
 
 @app.route('/profile')

@@ -23,7 +23,9 @@
                                 <table>
                                     <tr>
                                         {% for tag in tags[img] %}
-                                            <td>{{ tag }} |</td>
+                                            <td>
+                                                <a href="/tagphoto?tagname={{ tag }}"> {{ tag }} |</a>
+                                            </td>
                                         {% endfor %}
                                     </tr>
                                 </table>
