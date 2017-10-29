@@ -30,7 +30,10 @@ cursor = conn.cursor()
 cursor.execute("SELECT email FROM Users")
 users = cursor.fetchall()
 
+#Global variable
 Photo_Tags = {}
+working_path = os.getcwd() + '/static'
+
 
 def getUserList():
     cursor = conn.cursor()
@@ -65,6 +68,19 @@ def getUserFriend(uid):
     userid=getUsersId(flask_login.current_user.id)
     if cursor.execute("select * from friends where User_id_1='{0}'or FriendsUser_id_2='{0}'".format(userid)):
         return cursor.fetchall()
+
+def getAllPhotoCaption():
+    cursor=conn.cursor()
+    query = "select Caption from photos"
+    cursor.execute(query)
+    allCap = cursor.fetchall()
+    result =[]
+    if len(allCap) != 0:
+        for cap in allCap:
+            result.append(cap[0])
+
+    return result
+
 
 def AddFriend(uid):
     cursor=conn.cursor()
@@ -200,12 +216,13 @@ def AddPhoto(albumid,filename):
     conn.commit()
 
 def DeletePhoto(albumid,photoname):
+    global working_path
     userid = getUsersId(flask_login.current_user.id)
     cursor = conn.cursor()
     print("albumid="+albumid)
     cursor.execute("delete from photos where Caption='{0}' and Album_id={1} and user_id={2}".format(photoname,albumid,userid))
     conn.commit()
-    path="D:/BUCS/PhotoShare/program/static/{0}/{1}/{2}".format(userid,albumid,photoname)
+    path = working_path + "/{0}/{1}/{2}".format(userid,albumid,photoname)
     os.remove(path)
 
 @login_manager.user_loader
@@ -368,10 +385,11 @@ def album_get():
 @app.route("/albums", methods=['POST'])
 def album_post():
     print(str(request))
+    global working_path
     if request.form.get('add album'):
         albums = getUserAlbums(flask_login.current_user.id)
         if albums == None:
-            dir_create("D:/BUCS/PhotoShare/program/static/{0}".format(getUsersId(flask_login.current_user.id)))
+            dir_create(working_path + "/{0}".format(getUsersId(flask_login.current_user.id)))
         addAlbum(request.form.get('add album'), flask_login.current_user.id)
         albumsInfo = []
         albumIDs = []
@@ -379,7 +397,7 @@ def album_post():
         for a in albums:
             albumsInfo.append(a[1])
             albumIDs.append(a[0])
-        dir_create("D:/BUCS/PhotoShare/program/static/{0}/{1}".format(
+        dir_create(working_path + "/{0}/{1}".format(
             getUsersId(flask_login.current_user.id),albumIDs[-1]))
         print(albumsInfo)
         print(albumIDs)
@@ -404,8 +422,9 @@ def album_post():
 @flask_login.login_required
 def upload_file():
     global Photo_Tags
+    global working_path
     albumid = request.args.get('album_id')
-    UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(getUsersId(flask_login.current_user.id),
+    UPLOAD_FOLDER = working_path + "/{0}/{1}".format(getUsersId(flask_login.current_user.id),
                                                                        albumid)
     photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
 
@@ -436,7 +455,7 @@ def upload_file():
         uploadfile = request.files['uploadFile']
         filename = uploadfile.filename
         fname = os.listdir(UPLOAD_FOLDER)
-        if filename in fname:
+        if filename in getAllPhotoCaption():
             print('duplicate file name')
             return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
                                    aid=albumid, fname=fname)
@@ -455,11 +474,11 @@ def upload_file():
 @app.route('/upload', methods=['GET'])
 @flask_login.login_required
 def show_photo():
-    global Photo_Tags
+    global Photo_Tags, working_path
     print('66666666666666666666')
     albumid = request.args.get('album_id')
     photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
-    UPLOAD_FOLDER = "D:/BUCS/PhotoShare/program/static/{0}/{1}".format(
+    UPLOAD_FOLDER = working_path + "/{0}/{1}".format(
         getUsersId(flask_login.current_user.id), albumid)  ### CHANGE THIS
     print(UPLOAD_FOLDER)
     if not dir_create(UPLOAD_FOLDER):
@@ -469,7 +488,7 @@ def show_photo():
        for f in fname:
            Photo_Tags[f] = getTagsFromCaption(f)
        print(Photo_Tags)
-
+       print(os.getcwd())
        return render_template('upload.html', photopath=photopath, uid=getUsersId(flask_login.current_user.id),
                             aid=albumid, fname=fname, tags=Photo_Tags)
 
