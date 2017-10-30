@@ -14,7 +14,7 @@
             <h4>{{message}}!</h4>
         {% endif %}
         {% if photopath %}
-            {% if fname %}
+            {% if fname and pids %}
                 {% for img in fname %}
                     <ul>
                         <li>{{ img }} <br/>
@@ -38,6 +38,16 @@
                                 <input type="submit" name="delete_photo"  value="delete" >
                                 <input type="hidden" name="photoid"  value={{ img }} >
                             </form>
+                            {% if comments %}
+                                <table>
+                                    <tr>
+                                        {% for comment in comments[pids[loop.index0]] %}
+                                            <font color="red">{{ comment }} <br/></font>
+                                        {% endfor %}
+                                    </tr>
+                                </table>
+                            {% endif %}
+
 
 
 
@@ -47,5 +57,7 @@
 
             {% endif %}
         {% endif %}
+        <a href="/login"> Back to homepage </a> <br/>
+        <a href="/albums"> Back to album menu </a>
 
     </body>

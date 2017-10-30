@@ -1,14 +1,11 @@
-<head>
-    <title>Upload a file!</title>
-</head>
-    <body>
+ <body>
         {% if tag %}
             <div class="title">
                 <h1>Browse photos with tag {{ tag }}</h1>
             </div>
 
         {% endif %}
-        {% if photopath and captions %}
+        {% if photopath and captions and owners and current and pids %}
             {% for path in photopath %}
                 <ul>
                     <li>{{ captions[loop.index0] }} <br/>
@@ -16,10 +13,27 @@
                         {% if alltags %}
                             <table>
                                 <tr>
-                                    {% for tag in alltags[captions[loop.index0]] %}
+                                    {% for t in alltags[captions[loop.index0]] %}
                                         <td>
-                                            <a href="/tagphoto?tagname={{ tag }}"> {{ tag }} |</a>
+                                            <a href="/tagphoto?tagname={{ t }}"> {{ t }} |</a>
                                         </td>
+                                    {% endfor %}
+                                </tr>
+                            </table>
+                        {% endif %}
+                        {% if owners[loop.index0] != current %}
+                            <form action="/tagphoto?tagname={{ tag }}" method="post">
+                                <label for="add comment">Add a  new comment here:</label>
+                                <input type="text" name="add comment" maxlength="20">
+                                <input type="hidden" name="photo_id" value="{{ pids[loop.index0] }}">
+                                   <input type="submit" value="Add">
+                            </form>
+                        {% endif %}
+                        {% if comments %}
+                            <table>
+                                <tr>
+                                    {% for comment in comments[pids[loop.index0]] %}
+                                        <font color="red">{{ comment }} <br/></font>
                                     {% endfor %}
                                 </tr>
                             </table>
@@ -34,4 +48,7 @@
 
         {% endif %}
 
-    </body>
+        <a href="/allphoto"> Back to browse all photos </a> <br/>
+        <a href="/albums"> Back to your albums </a><br/>
+        <a href="/login"> Back to homepage </a> <br/>
+</body>

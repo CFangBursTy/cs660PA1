@@ -1,0 +1,50 @@
+ <body>
+
+    <div class="title">
+        <h1> Check all the awesome photos in PhotoShare </h1>
+    </div>
+
+    {% if photopath and captions and owners and current and pids %}
+        {% for path in photopath %}
+            <ul>
+                <li>{{ captions[loop.index0] }} <br/>
+                    <img src="{{ photopath[loop.index0] }}" height="80" width="120">
+                    {% if alltags %}
+                        <table>
+                            <tr>
+                                {% for tag in alltags[captions[loop.index0]] %}
+                                    <td>
+                                        <a href="/tagphoto?tagname={{ tag }}"> {{ tag }} |</a>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        </table>
+                    {% endif %}
+                    {% if owners[loop.index0] != current %}
+                        <form action="/allphoto" method="post">
+                            <label for="add comment">Add a  new comment here:</label>
+                            <input type="text" name="add comment" maxlength="20">
+                            <input type="hidden" name="photo_id" value="{{ pids[loop.index0] }}">
+                            <input type="submit" value="Add">
+                        </form>
+                    {% endif %}
+                    {% if comments %}
+                        <table>
+                            <tr>
+                                {% for comment in comments[pids[loop.index0]] %}
+                                    <font color="red">{{ comment }} <br/></font>
+                                {% endfor %}
+                            </tr>
+                        </table>
+                    {% endif %}
+
+
+
+                </li>
+            </ul>
+        {% endfor %}
+
+    {% endif %}
+    <a href="/login">Back to homepage</a>
+
+</body>

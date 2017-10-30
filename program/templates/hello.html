@@ -29,6 +29,11 @@
 </ul>
 <li><a href='/Friends'>Go to Visit Your Friends</a> </li>
 <li><a href='/albums'>Go to See Your Photos</a> </li>
+<li><a href="/allphoto">See all photos in PhotoShare!</a></li>
+<h2>The Top Popular Tags</h2>
+{% for row in tagname %}
+    <li><a href="/tagphoto?tagname={{ row }}"> {{ row }}</a></li>
+{% endfor %}
 
 
 {% if message is none %}

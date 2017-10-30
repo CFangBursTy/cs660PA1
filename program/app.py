@@ -32,6 +32,7 @@ users = cursor.fetchall()
 
 #Global variable
 Photo_Tags = {}
+Photo_Comments = {}
 working_path = os.getcwd() + '/static'
 
 
@@ -123,9 +124,22 @@ def deleteAlbum(aname, uid):
 
 def addTag(tname):
     cursor = conn.cursor()
-    query = "insert into tags(Tag_name) values ('{0}')".format(tname)
-    # pid = getPhotoIdFromCaption(caption)
-    # query = query + "insert into tagged(Photo_id, Tag_id) values({0}, {1}) ".format(pid, )
+    query="select Tag_id from tags where Tag_name='{0}'".format(tname)
+    cursor.execute(query)
+    if cursor.fetchone():
+        print("tag exist!")
+    else:
+        query = "insert into tags(Tag_name) values ('{0}')".format(tname)
+        cursor.execute(query)
+        conn.commit()
+
+def addComment(text, uid, pid):
+    cursor = conn.cursor()
+    uid = getUserIdFromEmail(uid)
+    Date = datetime.now().date()
+    query = "insert into comments(Comment_text, Comment_date, Photo_id, User_id) values ('{0}', '{1}', {2}, {3})".format(
+        text, Date, pid, uid
+    )
     cursor.execute(query)
     conn.commit()
 
@@ -149,39 +163,72 @@ def getTagsFromCaption(caption):
         result.append(tag[0])
 
     return result
-    
+
+def getAllCommentsFromPhoto(pid):
+    cursor = conn.cursor()
+    query = "select Comment_text, Email from comments, users where comments.Photo_id = {0} and comments.User_id = " \
+            "users.User_id".format(pid)
+    cursor.execute(query)
+    comments = cursor.fetchall()
+    result = []
+    for c in comments:
+        result.append(c[1] + ": " + c[0])
+    return result
+
+
 def getAllPhotosFromTag(tagname):
     cursor = conn.cursor()
-    query = "select Caption, Album_id, User_id from photos, tags, tagged where tags.Tag_name = '{0}' and " \
+    query = "select photos.Photo_id, Caption, Album_id, User_id from photos, tags, tagged where tags.Tag_name = '{0}' and " \
             "tags.Tag_id = tagged.Tag_id and tagged.Photo_id = photos.Photo_id".format(tagname)
     cursor.execute(query)
     photos = cursor.fetchall()
 
     return photos
 
-def addTagged(caption, uid, aid):
+def getAllphotos():
+    cursor = conn.cursor()
+    query = "select * from photos"
+    cursor.execute(query)
+    allphotos = cursor.fetchall()
+
+    return allphotos
+
+def getAllComments():
+    cursor = conn.cursor()
+    query = "select * from comments"
+    cursor.execute(query)
+    allcomments = cursor.fetchall()
+
+    print(allcomments)
+
+def addTagged(tagname,caption, uid, aid):
 
     # Get newest added tag id
     cursor = conn.cursor()
-    alltags = "select Tag_id from tags"
-    cursor.execute(alltags)
-    latest_tag_id = cursor.fetchall()[-1][0]
-
-
+    tagid = "select Tag_id from tags where Tag_name='{0}'".format(tagname)
+    cursor.execute(tagid)
+    tagid=cursor.fetchone()[0]
     # Get photo id based on the given caption
     uid = getUserIdFromEmail(uid)
     query = "select Photo_id from photos where Caption = '{0}' and  User_id = '{1}' and Album_id = '{2}'".format(
         caption, uid, aid)
     cursor.execute(query)
     pid = cursor.fetchone()[0]
-
-
-    query = "insert into tagged(Photo_id, Tag_id) values ('{0}', '{1}')".format(pid, latest_tag_id)
+    query="select Photo_id from tagged where Photo_id={0} and Tag_id={1}".format(pid,tagid)
     cursor.execute(query)
-    conn.commit()
+    if cursor.fetchone()!=None:
+        print("exist!")
+    else:
+        query = "insert into tagged(Photo_id, Tag_id) values ({0}, {1})".format(pid,tagid)
+        cursor.execute(query)
+        conn.commit()
 
 # def addTagged(tid, pid):
-
+def Gettagname(tagid):
+    cursor=conn.cursor()
+    query="select Tag_name from tags where Tag_id={0}".format(tagid)
+    cursor.execute(query)
+    return cursor.fetchone()[0]
 
 def getUserAlbums(uid):
     cursor = conn.cursor()
@@ -232,6 +279,27 @@ def DeletePhoto(albumid,photoname):
     conn.commit()
     path = working_path + "/{0}/{1}/{2}".format(userid,albumid,photoname)
     os.remove(path)
+
+def TopTags():
+    cursor=conn.cursor()
+    query="select tags.Tag_id,tags.Tag_name from tags,tagged where tags.Tag_id=tagged.Tag_id group by tagged.Tag_id Limit 10"
+    cursor.execute(query)
+    return cursor.fetchall()
+
+def initPhotoTags():
+    global Photo_Tags
+    allphotos = getAllphotos()
+    for photo in allphotos:
+        Photo_Tags[photo[1]] = getTagsFromCaption(photo[1])
+
+def initPhotoComments():
+    global Photo_Comments
+    allphotos = getAllphotos()
+
+    for photo in allphotos:
+        Photo_Comments[photo[0]] = getAllCommentsFromPhoto(photo[0])
+
+    print(Photo_Comments)
 
 @login_manager.user_loader
 def user_loader(email):
@@ -309,22 +377,57 @@ def login_post():
             flask_login.login_user(user)  # okay login in user
 
             #current_visiting_UserId = getUsersId(flask_login.current_user.id)
-            data=getUsersInfor(flask_login.current_user.id)
-            #return redirect(url_for('homepage', name=flask_login.current_user.id))
+            tagid = []
+            tagname = []
+            tags = TopTags()
+            for item in tags:
+                tagid.append(item[0])
+                tagname.append(item[1])
 
-            return render_template('hello.html', name=flask_login.current_user.id, message="1Here's your profile",data=data)
+            return redirect(url_for('homepage', name=flask_login.current_user.id, IDs=tagid, tagname=tagname))
+
+            # return render_template('hello.html', name=flask_login.current_user.id, message="1Here's your profile",data=data)
             #return flask.redirect(flask.url_for('protect3d'))  # protected is a function defined in this file
 
     # information did not match
     return "<a href='/login'>Try again</a>\
 			</br><a href='/register'>or make an account</a>"
 
+# @app.route('/Photos',methods=['GET'])
+# def Tophotphoto():
+#     tagid=request.args.get('tag_id')
+#     #gettagname
+#     allphotos = getAllPhotosFromTag(tagid)
+#     captions = []
+#     photopath = []
+#     for photos in allphotos:
+#         photopath.append("/static/{0}/{1}/{2}".format(photos[2], photos[1], photos[0]))
+#         captions.append(photos[0])
+#     tagname=Gettagname(tagid)
+#     print(tagname)
+#     print(photopath)
+#     print(captions)
+#     return  render_template('Photos.html', photopath=photopath, tag=tagname, alltags=Photo_Tags, captions=captions)
+
+
+
 @app.route('/homepage')
 @flask_login.login_required
 def homepage():
+    global Photo_Tags
     #print(request.args.get('data').split())
     data = getUsersInfor(request.args.get('name'))
-    return render_template('hello.html', name=request.args.get('name'), message='Awesome Photoshare System', data=data)
+    initPhotoTags()
+    initPhotoComments()
+    print(Photo_Tags)
+    tagid = []
+    tagname = []
+    tags = TopTags()
+    for item in tags:
+        tagid.append(item[0])
+        tagname.append(item[1])
+
+    return render_template('hello.html', IDs=tagid, tagname=tagname, name=request.args.get('name'), message='Awesome Photoshare System', data=data)
 
 @app.route('/logout')
 def logout():
@@ -429,7 +532,7 @@ def album_post():
 @app.route('/upload', methods=['POST'])
 @flask_login.login_required
 def upload_file():
-    global Photo_Tags
+    global Photo_Tags, Photo_Comments
     global working_path
     albumid = request.args.get('album_id')
     UPLOAD_FOLDER = working_path + "/{0}/{1}".format(getUsersId(flask_login.current_user.id),
@@ -439,13 +542,16 @@ def upload_file():
     print(request.form)
     if request.form.get('add tag'):
         addTag(request.form.get('add tag'))
-        addTagged(request.form.get('imgname'), flask_login.current_user.id, albumid)
+        addTagged(request.form.get('add tag'), request.form.get('imgname'), flask_login.current_user.id, albumid)
         fname = os.listdir(UPLOAD_FOLDER)
         tags = getTagsFromCaption(request.form.get('imgname'))
         Photo_Tags[request.form.get('imgname')] = tags
         print(Photo_Tags)
+        photo_ids = []
+        for file in fname:
+            photo_ids.append(getPhotoIdFromCaption(file))
         return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
-                                aid=albumid, fname=fname, tags=Photo_Tags)
+                                aid=albumid, fname=fname, tags=Photo_Tags, comments=Photo_Comments, pids=photo_ids)
     elif request.form.get('delete_photo', None) == "delete":
         print("helloworld")
         photoid = request.form.get('photoid')
@@ -454,9 +560,11 @@ def upload_file():
         print(Photo_Tags)
         print('55555555555555')
         fname = os.listdir(UPLOAD_FOLDER)
-
+        photo_ids = []
+        for file in fname:
+            photo_ids.append(getPhotoIdFromCaption(file))
         return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
-                               aid=albumid, fname=fname, tags=Photo_Tags)
+                               aid=albumid, fname=fname, tags=Photo_Tags, comments=Photo_Comments, pids=photo_ids)
     else:
         dir_create(UPLOAD_FOLDER)
         app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -465,24 +573,29 @@ def upload_file():
         fname = os.listdir(UPLOAD_FOLDER)
         if filename in getAllPhotoCaption():
             print('duplicate file name')
+            photo_ids = []
+            for file in fname:
+                photo_ids.append(getPhotoIdFromCaption(file))
             return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
-                                   aid=albumid, fname=fname)
+                                   aid=albumid, fname=fname, tags=Photo_Tags, comments=Photo_Comments, pids=photo_ids)
         else:
             uploadfile.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
 
             AddPhoto(albumid,filename)
             fname = os.listdir(UPLOAD_FOLDER)
+            photo_ids = []
             for f in fname:
                 Photo_Tags[f] = getTagsFromCaption(f)
-            print(Photo_Tags)
+                photo_ids.append(getPhotoIdFromCaption(f))
+
             return render_template('upload.html', photopath=photopath, uid=str(getUsersId(flask_login.current_user.id)),
-                               aid=albumid, fname=fname, tags=Photo_Tags)
+                               aid=albumid, fname=fname, tags=Photo_Tags, comments=Photo_Comments, pids=photo_ids)
 
 # E
 @app.route('/upload', methods=['GET'])
 @flask_login.login_required
 def show_photo():
-    global Photo_Tags, working_path
+    global Photo_Tags, working_path, Photo_Comments
     print('66666666666666666666')
     albumid = request.args.get('album_id')
     photopath = "/static/{0}/{1}".format(getUsersId(flask_login.current_user.id), albumid)
@@ -493,29 +606,101 @@ def show_photo():
         return render_template('upload.html')
     else:
        fname = os.listdir(UPLOAD_FOLDER)
-       for f in fname:
-           Photo_Tags[f] = getTagsFromCaption(f)
-       print(Photo_Tags)
-       print(os.getcwd())
+       photo_ids = []
+       for file in fname:
+           photo_ids.append(getPhotoIdFromCaption(file))
+
        return render_template('upload.html', photopath=photopath, uid=getUsersId(flask_login.current_user.id),
-                            aid=albumid, fname=fname, tags=Photo_Tags)
+                            aid=albumid, fname=fname, tags=Photo_Tags, comments=Photo_Comments, pids=photo_ids)
 
 @app.route('/tagphoto', methods=['GET'])
 def tagphoto():
-    global Photo_Tags
+    global Photo_Tags, Photo_Comments
     tagname = request.args.get('tagname')
     print(tagname)
     allphotos = getAllPhotosFromTag(tagname)
     captions = []
+    photo_owner = []
+    photo_ids = []
     photopath = []
     for photos in allphotos:
-        photopath.append("/static/{0}/{1}/{2}".format(photos[2], photos[1], photos[0]))
-        captions.append(photos[0])
+        photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+        captions.append(photos[1])
+        photo_owner.append(photos[3])
+        photo_ids.append(photos[0])
 
-    print(photopath)
-    print(captions)
-    return  render_template('tagphoto.html', photopath=photopath, tag=tagname, alltags=Photo_Tags, captions=captions)
+    current_user = getUserIdFromEmail(flask_login.current_user.id)
 
+    return render_template('tagphoto.html', photopath=photopath, tag=tagname, pids=photo_ids, comments=Photo_Comments,
+                           current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+
+@app.route('/tagphoto', methods=['POST'])
+def tagphoto_comment():
+    global Photo_Comments, Photo_Tags
+    if request.form.get('add comment') and request.form.get('photo_id'):
+        text = request.form.get('add comment')
+        tagname = request.args.get('tagname')
+        addComment(text, flask_login.current_user.id, request.form.get('photo_id'))
+        allphotos = getAllPhotosFromTag(tagname)
+        captions = []
+        photo_owner = []
+        photo_ids = []
+        photopath = []
+        for photos in allphotos:
+            photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+            captions.append(photos[1])
+            photo_owner.append(photos[3])
+            photo_ids.append(photos[0])
+
+        current_user = getUserIdFromEmail(flask_login.current_user.id)
+        initPhotoComments()
+        return render_template('tagphoto.html', photopath=photopath, tag=tagname, pids=photo_ids, comments=Photo_Comments,
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+
+
+@app.route('/allphoto', methods=['GET'])
+def allphoto():
+    global Photo_Tags, Photo_Comments
+
+    allphotos = getAllphotos()
+    captions = []
+    photo_owner = []
+    photo_ids = []
+    photopath = []
+    for photos in allphotos:
+        photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+        captions.append(photos[1])
+        photo_owner.append(photos[3])
+        photo_ids.append(photos[0])
+
+    current_user = getUserIdFromEmail(flask_login.current_user.id)
+
+    return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
+                           current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+
+@app.route('/allphoto', methods=['POST'])
+def allphoto_comment():
+    global Photo_Comments, Photo_Tags
+    print(request.form.get('add comment'))
+    print(request.form.get('photo_id'))
+    if request.form.get('add comment') and request.form.get('photo_id'):
+        text = request.form.get('add comment')
+        addComment(text, flask_login.current_user.id, request.form.get('photo_id'))
+        allphotos = getAllphotos()
+        captions = []
+        photo_owner = []
+        photo_ids = []
+        photopath = []
+        for photos in allphotos:
+            photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+            captions.append(photos[1])
+            photo_owner.append(photos[3])
+            photo_ids.append(photos[0])
+
+        current_user = getUserIdFromEmail(flask_login.current_user.id)
+        initPhotoComments()
+        return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
 
 
 @app.route('/profile')
