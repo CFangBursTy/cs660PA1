@@ -3,7 +3,24 @@
     <div class="title">
         <h1> Check all the awesome photos in PhotoShare </h1>
     </div>
-
+    <form action="/allphoto" method="post" >
+        <label for="search">Search Photos Here!</label>
+        <input type="text" name="search1" maxlength="50"></br>
+        <input type="submit" name="submit1" value="submit"></form></br>
+    </form>
+    <form action="/allphoto" method="post" >
+        <label for="search">Search For Comments  Here!</label>
+        <input type="text" name="search2" maxlength="50"></br>
+        <input type="submit" name="submit2" value="submit">
+    </form>
+    {% if users %}
+            <h1>Who Makes Comments Most!</h1>
+            {% for user in users %}
+                <li>
+                {{ user }}
+                </li>
+            {% endfor %}
+    {% endif %}
     {% if photopath and captions and owners and current and pids %}
         {% for path in photopath %}
             <ul>

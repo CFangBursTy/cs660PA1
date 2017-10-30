@@ -5,6 +5,7 @@ from flask import Flask, Response, request, render_template, redirect, url_for
 from flaskext.mysql import MySQL
 import flask.ext.login as flask_login
 from datetime import date,datetime
+import sys
 
 # for image uploading
 # from werkzeug import secure_filename
@@ -61,7 +62,7 @@ def getUsersId(uid):
 
 def getUsersInfor(uid):
     cursor=conn.cursor()
-    cursor.execute("Select * from users where Email='{0}' or user_id='{0}'".format(uid))
+    cursor.execute("Select User_id,Firstname,Lastname,Gender,Hometown,Birthdate,Email from users where Email='{0}' or user_id='{0}'".format(uid))
     return cursor.fetchall()
 
 def getUserFriend(uid):
@@ -275,6 +276,7 @@ def DeletePhoto(albumid,photoname):
     userid = getUsersId(flask_login.current_user.id)
     cursor = conn.cursor()
     print("albumid="+albumid)
+    #query="delete from photos where Caption='{0}' and Album_id={1} and user_id={2}".format(photoname,albumid,userid)
     cursor.execute("delete from photos where Caption='{0}' and Album_id={1} and user_id={2}".format(photoname,albumid,userid))
     conn.commit()
     path = working_path + "/{0}/{1}/{2}".format(userid,albumid,photoname)
@@ -282,7 +284,7 @@ def DeletePhoto(albumid,photoname):
 
 def TopTags():
     cursor=conn.cursor()
-    query="select tags.Tag_id,tags.Tag_name from tags,tagged where tags.Tag_id=tagged.Tag_id group by tagged.Tag_id Limit 10"
+    query="select tags.Tag_id,tags.Tag_name from tags,tagged where tags.Tag_id=tagged.Tag_id group by tagged.Tag_id order by count(*) DESC Limit 10"
     cursor.execute(query)
     return cursor.fetchall()
 
@@ -300,6 +302,46 @@ def initPhotoComments():
         Photo_Comments[photo[0]] = getAllCommentsFromPhoto(photo[0])
 
     print(Photo_Comments)
+
+def GetPhoto(photoid):
+    cursor=conn.cursor()
+    query="select * from photos where Photo_id={}".format(photoid)
+    cursor.execute(query)
+    return cursor.fetchone()
+
+def PhotoSearch(sentence):
+    words=sentence.split()
+    print(words)
+    cursor=conn.cursor()
+    query="SELECT t0.Photo_id from (select Photo_id from tagged,tags where Tag_name='{0}' and tagged.Tag_id=tags.Tag_id) t0".format(words[0])
+    after=" "
+    for i in range(1,len(words)):
+        add1=" inner join (select Photo_id from tagged,tags where Tag_name='{0}' and tagged.Tag_id=tags.Tag_id) t{1} " \
+             "on t0.Photo_id=t{2}.Photo_id".format(words[i],i,i)
+        query=query+add1
+    print(query)
+    cursor.execute(query)
+    photo=[]
+    for item in cursor.fetchall():
+        photo.append(GetPhoto(item[0]))
+    print(photo)
+    return photo
+
+def CommentSearch(comment):
+    words=comment.split()
+    cursor=conn.cursor()
+    query="select * from comments where Comment_text like '%{0}%'".format(words[0])
+    for i in range(1,len(words)):
+        query=query+" and Comment_text like '%{0}%'".format(words[i])
+    query=query+" group by User_id order by count(*) DESC limit 1"
+    print(query)
+    cursor.execute(query)
+    return cursor.fetchall()
+
+def CommentUser(comment,userid):
+    words=comment.split()
+    cursor=conn.cursor()
+    query="select * from photos,comments where"
 
 @login_manager.user_loader
 def user_loader(email):
@@ -683,6 +725,48 @@ def allphoto_comment():
     global Photo_Comments, Photo_Tags
     print(request.form.get('add comment'))
     print(request.form.get('photo_id'))
+    print(request.form.get('search'))
+    if request.form.get('submit2'):
+        print("search comments!")
+        comment=request.form.get('search2')
+        comment_user=CommentSearch(comment)
+        users=[]
+        photos=[]
+        for item in comment_user:
+            users.append(getUsersInfor(item[4]))
+            #photos.append(CommentUser(comment,getUserInfor(item[4])))
+        print(users)
+        allphotos = getAllphotos()
+        captions = []
+        photo_owner = []
+        photo_ids = []
+        photopath = []
+        for photos in allphotos:
+            photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+            captions.append(photos[1])
+            photo_owner.append(photos[3])
+            photo_ids.append(photos[0])
+        current_user = getUserIdFromEmail(flask_login.current_user.id)
+        initPhotoComments()
+        return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,users=users,
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+
+    if request.form.get('submit1'):
+        sentence=request.form.get('search1')
+        photos=PhotoSearch(sentence)
+        captions = []
+        photo_owner = []
+        photo_ids = []
+        photopath = []
+        for photos in photos:
+            photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+            captions.append(photos[1])
+            photo_owner.append(photos[3])
+            photo_ids.append(photos[0])
+        current_user = getUserIdFromEmail(flask_login.current_user.id)
+        initPhotoComments()
+        return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
+                                   current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
     if request.form.get('add comment') and request.form.get('photo_id'):
         text = request.form.get('add comment')
         addComment(text, flask_login.current_user.id, request.form.get('photo_id'))
@@ -696,7 +780,6 @@ def allphoto_comment():
             captions.append(photos[1])
             photo_owner.append(photos[3])
             photo_ids.append(photos[0])
-
         current_user = getUserIdFromEmail(flask_login.current_user.id)
         initPhotoComments()
         return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
