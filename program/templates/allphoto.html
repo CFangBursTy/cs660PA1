@@ -25,7 +25,25 @@
         {% for path in photopath %}
             <ul>
                 <li>{{ captions[loop.index0] }} <br/>
+                    {% if no_likes and user_likes %}
+                        <font color="red"> {{ no_likes[pids[loop.index0]] }} Liked!</font>
+                        <table>
+                            <tr>
+                                {% for user in user_likes[pids[loop.index0]] %}
+                                    <td>
+                                        <font color="red"> {{ user }}, </font>
+                                    </td>
+                                {% endfor %}
+                            </tr>
+                        </table>
+                    {% endif %}
+
                     <img src="{{ photopath[loop.index0] }}" height="80" width="120">
+                    <form action="/allphoto" method="POST">
+                        <input type="hidden" name="like_photo" value="{{ pids[loop.index0] }}">
+                        <input type="submit" name="like" value="like">
+
+                    </form>
                     {% if alltags %}
                         <table>
                             <tr>
@@ -49,7 +67,7 @@
                         <table>
                             <tr>
                                 {% for comment in comments[pids[loop.index0]] %}
-                                    <font color="red">{{ comment }} <br/></font>
+                                    <font color="blue">{{ comment }} <br/></font>
                                 {% endfor %}
                             </tr>
                         </table>

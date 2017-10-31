@@ -34,6 +34,8 @@ users = cursor.fetchall()
 #Global variable
 Photo_Tags = {}
 Photo_Comments = {}
+Photo_LikesNum = {}
+Photo_LikesUsers = {}
 working_path = os.getcwd() + '/static'
 
 
@@ -65,6 +67,17 @@ def getUsersInfor(uid):
     cursor.execute("Select User_id,Firstname,Lastname,Gender,Hometown,Birthdate,Email from users where Email='{0}' or user_id='{0}'".format(uid))
     return cursor.fetchall()
 
+def getUsersInformation(uid):
+    cursor = conn.cursor()
+    cursor.execute("Select Email from users where user_id={0}".format(uid))
+    return cursor.fetchall()
+
+def getUsersIn(uid):
+    cursor=conn.cursor()
+    cursor.execute("Select User_id,Firstname,Lastname,Gender,Hometown,Birthdate,Email from users where Email='{0}'".format(uid))
+    return cursor.fetchall()
+
+
 def getUserFriend(uid):
     cursor=conn.cursor()
     userid=getUsersId(flask_login.current_user.id)
@@ -88,7 +101,7 @@ def AddFriend(uid):
     cursor=conn.cursor()
     curid=getUsersId(flask_login.current_user.id)
     print(getUsersId(uid))
-    print(cursor.execute("insert into friends(User_id_1,FriendsUser_id_2) values('{0}','{1}')".format(curid,getUsersId(uid))))
+    print(cursor.execute("insert into friends(User_id_1,FriendsUser_id_2) values('{0}','{1}')".format(curid, getUsersId(uid))))
     conn.commit()
 
 def DeleteFriend(uid):
@@ -143,6 +156,36 @@ def addComment(text, uid, pid):
     )
     cursor.execute(query)
     conn.commit()
+
+def addLike(uid, pid):
+    cursor = conn.cursor()
+    uid = getUserIdFromEmail(uid)
+    cursor.execute("select User_id from likes where Photo_id = {0} and User_id = {1}".format(pid, uid))
+    if cursor.fetchone() == None:
+        print('insert likes')
+        query = "insert into likes(User_id, Photo_id) values ({0}, {1})".format(uid, pid)
+        cursor.execute(query)
+        conn.commit()
+    else:
+        print('already liked')
+
+def getLikeNumfromPhotoID(pid):
+    cursor = conn.cursor()
+    query = "select count(User_id) as no_likes from likes where Photo_id = {0}".format(pid)
+    cursor.execute(query)
+    no_likes = cursor.fetchone()[0]
+    return no_likes
+
+def getLikeUserFromPhotoID(pid):
+    cursor = conn.cursor()
+    query = "select Email from likes, users where likes.Photo_id = {0} and likes.User_id = users.User_id ".format(pid)
+    cursor.execute(query)
+    temp = cursor.fetchall()
+    users = []
+    for user in temp:
+        users.append(user[0])
+    return users
+
 
 def getPhotoIdFromCaption(caption):
     cursor = conn.cursor()
@@ -303,6 +346,14 @@ def initPhotoComments():
 
     print(Photo_Comments)
 
+def initPhotoLikes():
+    global Photo_LikesNum, Photo_LikesUsers
+    allphotos = getAllphotos()
+
+    for photo in allphotos:
+        Photo_LikesUsers[photo[0]] = getLikeUserFromPhotoID(photo[0])
+        Photo_LikesNum[photo[0]] = getLikeNumfromPhotoID(photo[0])
+
 def GetPhoto(photoid):
     cursor=conn.cursor()
     query="select * from photos where Photo_id={}".format(photoid)
@@ -333,7 +384,7 @@ def CommentSearch(comment):
     query="select * from comments where Comment_text like '%{0}%'".format(words[0])
     for i in range(1,len(words)):
         query=query+" and Comment_text like '%{0}%'".format(words[i])
-    query=query+" group by User_id order by count(*) DESC limit 1"
+    query=query+" group by User_id order by count(*) DESC limit 3"
     print(query)
     cursor.execute(query)
     return cursor.fetchall()
@@ -341,7 +392,14 @@ def CommentSearch(comment):
 def CommentUser(comment,userid):
     words=comment.split()
     cursor=conn.cursor()
-    query="select * from photos,comments where"
+    query="select photos.Photo_id,Caption,Album_id,photos.User_id from photos,comments where Comment_text like '%{0}%'".format(words[0])
+    for i in range(1,len(words)):
+        query=query+" and Comment_text like '%{0}%'".format(words[i])
+    query=query+" and photos.Photo_id=comments.Photo_id and comments.user_id={0}".format(userid)
+    cursor.execute(query)
+    #print(query)
+    return cursor.fetchall()
+
 
 @login_manager.user_loader
 def user_loader(email):
@@ -458,9 +516,10 @@ def login_post():
 def homepage():
     global Photo_Tags
     #print(request.args.get('data').split())
-    data = getUsersInfor(request.args.get('name'))
+    data = getUsersIn(request.args.get('name'))
     initPhotoTags()
     initPhotoComments()
+    initPhotoLikes()
     print(Photo_Tags)
     tagid = []
     tagname = []
@@ -674,11 +733,34 @@ def tagphoto():
     current_user = getUserIdFromEmail(flask_login.current_user.id)
 
     return render_template('tagphoto.html', photopath=photopath, tag=tagname, pids=photo_ids, comments=Photo_Comments,
-                           current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+                           current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                           no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
 
 @app.route('/tagphoto', methods=['POST'])
 def tagphoto_comment():
-    global Photo_Comments, Photo_Tags
+    global Photo_Comments, Photo_Tags, Photo_LikesUsers, Photo_LikesNum
+    if request.form.get('like_photo'):
+        pid = request.form.get('like_photo')
+        addLike(flask_login.current_user.id, pid)
+        tagname = request.args.get('tagname')
+        allphotos = getAllPhotosFromTag(tagname)
+        captions = []
+        photo_owner = []
+        photo_ids = []
+        photopath = []
+        for photos in allphotos:
+            photopath.append("/static/{0}/{1}/{2}".format(photos[3], photos[2], photos[1]))
+            captions.append(photos[1])
+            photo_owner.append(photos[3])
+            photo_ids.append(photos[0])
+        current_user = getUserIdFromEmail(flask_login.current_user.id)
+        initPhotoComments()
+        initPhotoLikes()
+        print(Photo_LikesUsers[int(pid)])
+        return render_template('tagphoto.html', photopath=photopath, pids=photo_ids, tag=tagname, comments=Photo_Comments,
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                               no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
+
     if request.form.get('add comment') and request.form.get('photo_id'):
         text = request.form.get('add comment')
         tagname = request.args.get('tagname')
@@ -696,8 +778,10 @@ def tagphoto_comment():
 
         current_user = getUserIdFromEmail(flask_login.current_user.id)
         initPhotoComments()
+        initPhotoLikes()
         return render_template('tagphoto.html', photopath=photopath, tag=tagname, pids=photo_ids, comments=Photo_Comments,
-                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                               no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
 
 
 @app.route('/allphoto', methods=['GET'])
@@ -717,25 +801,18 @@ def allphoto():
 
     current_user = getUserIdFromEmail(flask_login.current_user.id)
 
-    return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
-                           current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+    return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments, no_likes=Photo_LikesNum,
+                           user_likes=Photo_LikesUsers, current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
 
 @app.route('/allphoto', methods=['POST'])
 def allphoto_comment():
-    global Photo_Comments, Photo_Tags
-    print(request.form.get('add comment'))
-    print(request.form.get('photo_id'))
-    print(request.form.get('search'))
-    if request.form.get('submit2'):
-        print("search comments!")
-        comment=request.form.get('search2')
-        comment_user=CommentSearch(comment)
-        users=[]
-        photos=[]
-        for item in comment_user:
-            users.append(getUsersInfor(item[4]))
-            #photos.append(CommentUser(comment,getUserInfor(item[4])))
-        print(users)
+    global Photo_Comments, Photo_Tags, Photo_LikesUsers, Photo_LikesNum
+
+
+    if request.form.get('like_photo'):
+        pid = request.form.get('like_photo')
+        addLike(flask_login.current_user.id, pid)
+
         allphotos = getAllphotos()
         captions = []
         photo_owner = []
@@ -748,8 +825,45 @@ def allphoto_comment():
             photo_ids.append(photos[0])
         current_user = getUserIdFromEmail(flask_login.current_user.id)
         initPhotoComments()
+        initPhotoLikes()
+        print(Photo_LikesUsers[int(pid)])
+        return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                               no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
+
+    if request.form.get('submit2'):
+        #print("search comments!")
+        comment=request.form.get('search2')
+        comment_user=CommentSearch(comment)
+        users=[]
+        photos_=[]
+        for item in comment_user:
+            users.append(getUsersInformation(item[4]))
+            photos_.append(CommentUser(comment,item[4]))
+        #print(users)
+        print("photos=")
+        print(photos_)
+        print("over")
+        allphotos = photos_
+        captions = []
+        photo_owner = []
+        photo_ids = []
+        photopath = []
+        for photos in allphotos:
+            i=0
+            while(i!=len(photos)):
+              photopath.append("/static/{0}/{1}/{2}".format(photos[i][3], photos[i][2], photos[i][1]))
+              captions.append(photos[i][1])
+              photo_owner.append(photos[i][3]  )
+              photo_ids.append(photos[i][0])
+              i=i+1
+        current_user = getUserIdFromEmail(flask_login.current_user.id)
+        initPhotoComments()
+        initPhotoLikes()
         return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,users=users,
-                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                               no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
+
 
     if request.form.get('submit1'):
         sentence=request.form.get('search1')
@@ -765,8 +879,11 @@ def allphoto_comment():
             photo_ids.append(photos[0])
         current_user = getUserIdFromEmail(flask_login.current_user.id)
         initPhotoComments()
+        initPhotoLikes()
         return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
-                                   current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+                                   current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                               no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
+
     if request.form.get('add comment') and request.form.get('photo_id'):
         text = request.form.get('add comment')
         addComment(text, flask_login.current_user.id, request.form.get('photo_id'))
@@ -782,8 +899,10 @@ def allphoto_comment():
             photo_ids.append(photos[0])
         current_user = getUserIdFromEmail(flask_login.current_user.id)
         initPhotoComments()
+        initPhotoLikes()
         return render_template('allphoto.html', photopath=photopath, pids=photo_ids, comments=Photo_Comments,
-                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions)
+                               current=current_user, owners=photo_owner, alltags=Photo_Tags, captions=captions,
+                               no_likes=Photo_LikesNum, user_likes=Photo_LikesUsers)
 
 
 @app.route('/profile')
